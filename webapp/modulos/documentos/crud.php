@@ -1,0 +1,73 @@
+<?php
+session_start();
+include("../session.php");
+$ano = $_SESSION['ano'];
+
+// Conexión a la base de datos
+$servername = "localhost";
+$username   = "root";
+$password   = "";
+$database   = "acadsuite_fose_iexarasoft";
+
+$conn = new mysqli($servername, $username, $password, $database);
+if ($conn->connect_error) {
+    die(json_encode(["status" => "error", "message" => "Conexión fallida: " . $conn->connect_error]));
+}
+
+// Manejo de peticiones CRUD
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json');
+    $action = $_POST['action'] ?? '';
+
+    switch ($action) {
+        case 'crear':
+            // Validamos que se hayan definido todos los campos.
+            // Usamos isset() para campos numéricos ya que pueden ser 0.
+            if (isset($_POST['idcuenta'], $_POST['documento'], $_POST['naturaleza'])) {
+                $stmt = $conn->prepare("INSERT INTO documentos (idcuenta, documento, naturaleza) VALUES (?, ?, ?)");
+                $stmt->bind_param("isi", $_POST['idcuenta'], $_POST['documento'], $_POST['naturaleza']);
+                if ($stmt->execute()) {
+                    echo json_encode(["status" => "success", "message" => "Registro creado exitosamente"]);
+                } else {
+                    echo json_encode(["status" => "error", "message" => "Error al crear el registro: " . $stmt->error]);
+                }
+                $stmt->close();
+                exit;
+            }
+            break;
+
+        case 'editar':
+            // Se requiere el id y los demás campos.
+            if (!empty($_POST['id']) && isset($_POST['idcuenta'], $_POST['documento'], $_POST['naturaleza'])) {
+                $stmt = $conn->prepare("UPDATE documentos SET idcuenta = ?, documento = ?, naturaleza = ? WHERE iddoc = ?");
+                $stmt->bind_param("isii", $_POST['idcuenta'], $_POST['documento'], $_POST['naturaleza'], $_POST['id']);
+                if ($stmt->execute()) {
+                    echo json_encode(["status" => "success", "message" => "Registro actualizado correctamente"]);
+                } else {
+                    echo json_encode(["status" => "error", "message" => "Error al actualizar el registro: " . $stmt->error]);
+                }
+                $stmt->close();
+                exit;
+            }
+            break;
+
+        case 'eliminar':
+            if (!empty($_POST['id'])) {
+                $stmt = $conn->prepare("DELETE FROM documentos WHERE iddoc = ?");
+                $stmt->bind_param("i", $_POST['id']);
+                if ($stmt->execute()) {
+                    echo json_encode(["status" => "success", "message" => "Registro eliminado"]);
+                } else {
+                    echo json_encode(["status" => "error", "message" => "Error al eliminar el registro: " . $stmt->error]);
+                }
+                $stmt->close();
+                exit;
+            }
+            break;
+    }
+    echo json_encode(["status" => "error", "message" => "Acción inválida"]);
+    exit;
+}
+
+$query  = "SELECT * FROM documentos";
+$result = $conn->query($query);
